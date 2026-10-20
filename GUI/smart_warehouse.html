@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Smart Warehouse Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E7EAED; --panel:#FFFFFF; --ink:#1D2A33; --muted:#5C6B76; --line:#C8D0D6;
+  --rail:#1D2A33; --rail-ink:#DDE4E9; --rail-muted:#8FA0AC;
+  --signal:#F2B705; --signal-ink:#2B2200; --steel:#2F5D7C; --ok:#2E7D4F; --bad:#B83227;
+  --floor:#F3F5F6; --lane:#9AA7B0; --soft:#EEF1F3;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#141A1F; --panel:#1C242B; --ink:#E4EAEE; --muted:#93A3AE; --line:#2F3C46;
+    --rail:#0F1418; --rail-ink:#DDE4E9; --rail-muted:#7D8E9A;
+    --steel:#7FB2D4; --ok:#5CBF83; --bad:#EF6B5E; --floor:#182026; --lane:#4E5D68; --soft:#232D35;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141A1F; --panel:#1C242B; --ink:#E4EAEE; --muted:#93A3AE; --line:#2F3C46;
+  --rail:#0F1418; --rail-ink:#DDE4E9; --rail-muted:#7D8E9A;
+  --steel:#7FB2D4; --ok:#5CBF83; --bad:#EF6B5E; --floor:#182026; --lane:#4E5D68; --soft:#232D35;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Archivo","Helvetica Neue",Arial,system-ui,sans-serif;font-size:15px;line-height:1.5}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+aside{background:var(--rail);color:var(--rail-ink);display:flex;flex-direction:column}
+.hazard{height:8px;background:repeating-linear-gradient(-45deg,var(--signal) 0 12px,#1a1a1a 12px 24px)}
+.brand{padding:22px 20px 18px}
+.brand b{display:block;font-stretch:70%;font-weight:800;font-size:26px;line-height:1.05;letter-spacing:.2px}
+.brand span{color:var(--rail-muted);font-size:13px}
+nav{display:flex;flex-direction:column;padding:4px 10px;gap:2px}
+nav button{all:unset;cursor:pointer;padding:10px 12px;border-radius:4px;color:var(--rail-muted);font-weight:500;display:flex;justify-content:space-between;align-items:center}
+nav button:hover{color:var(--rail-ink);background:rgba(255,255,255,.05)}
+nav button.on{color:var(--rail-ink);background:rgba(255,255,255,.08);box-shadow:inset 3px 0 0 var(--signal)}
+nav button:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+nav small{font-size:12px;color:var(--rail-muted)}
+.team{margin-top:auto;padding:18px 20px;font-size:13px;color:var(--rail-muted);border-top:1px solid rgba(255,255,255,.08)}
+.team p{margin:0 0 6px}.team strong{color:var(--rail-ink);font-weight:600}
+.railfoot{display:flex;gap:8px;padding:0 20px 20px}
+.railfoot button{flex:1;background:transparent;border:1px solid rgba(255,255,255,.18);color:var(--rail-ink);border-radius:4px;padding:7px;font:inherit;font-size:13px;cursor:pointer}
+
+main{padding:28px 32px 48px;min-width:0}
+header.view-h{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:22px}
+h1{font-stretch:72%;font-weight:800;font-size:40px;line-height:1;margin:0}
+.sub{color:var(--muted);margin:6px 0 0;max-width:62ch}
+h2{font-size:16px;font-weight:700;margin:0 0 12px}
+.view{display:none}.view.on{display:block}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.g-side{grid-template-columns:minmax(0,2fr) minmax(280px,1fr)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px;min-width:0}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:6px;background:var(--panel);margin-bottom:16px}
+.stat{padding:16px 18px;border-left:1px solid var(--line)}.stat:first-child{border-left:0}
+.stat b{display:block;font-stretch:75%;font-weight:700;font-size:30px;line-height:1.1}
+.stat span{color:var(--muted);font-size:13px}
+.stat.warn b{color:var(--bad)}
+
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+input,select{width:100%;font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:8px 10px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--steel);outline-offset:1px}
+.row{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));margin-bottom:10px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font:inherit;font-weight:600;border-radius:4px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+.btn.primary:hover{filter:brightness(.95)}
+.btn.danger{color:var(--bad)}
+.btn.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+.hint.bad{color:var(--bad)}.hint.ok{color:var(--ok)}
+
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums}
+tr.hit td{background:color-mix(in srgb,var(--signal) 22%,transparent)}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.p-pending{color:var(--steel)}.p-processed{color:var(--ok)}.p-out{color:var(--bad)}.p-cancelled{color:var(--muted)}
+.low{color:var(--bad);font-weight:600}
+.empty{color:var(--muted);padding:14px 0;margin:0}
+.ds-tag{font-size:12px;color:var(--muted);font-weight:500;margin-left:6px}
+
+/* queue */
+.queue{display:flex;gap:10px;overflow-x:auto;padding:22px 2px 6px;align-items:stretch}
+.qcell{position:relative;min-width:150px;border:1px solid var(--line);border-radius:4px;padding:10px 12px;background:var(--soft)}
+.qcell .tag{position:absolute;top:-19px;left:0;font-size:12px;font-weight:700;color:var(--muted)}
+.qcell.front{border-color:var(--signal);box-shadow:inset 0 3px 0 var(--signal)}
+.qcell b{display:block;font-size:14px}.qcell span{font-size:13px;color:var(--muted)}
+.qarrow{align-self:center;color:var(--muted)}
+
+/* hash */
+.buckets{font-size:13px;display:grid;gap:4px}
+.bucket{display:flex;align-items:center;gap:6px;overflow-x:auto;white-space:nowrap;padding:3px 0}
+.bucket .idx{width:28px;flex:none;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.chain{display:inline-block;padding:3px 8px;border:1px solid var(--line);border-radius:3px;background:var(--soft)}
+.chain.hit{border-color:var(--signal);background:color-mix(in srgb,var(--signal) 25%,var(--panel))}
+.nul{color:var(--muted)}
+.bucket.probe .idx{color:var(--ink);font-weight:700}
+
+/* map */
+.mapbox{background:var(--floor);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+#map{display:block;width:100%;height:auto;touch-action:manipulation}
+#map.placing{cursor:crosshair}
+.edge{stroke:var(--lane);stroke-width:7;stroke-linecap:round}
+.edge.route{stroke:var(--signal)}
+.edge.blocked{stroke:var(--bad);stroke-dasharray:4 8;stroke-width:4}
+.edge-hit{stroke:transparent;stroke-width:22;cursor:pointer}
+.elabel rect{fill:var(--panel);stroke:var(--line)}
+.elabel text{fill:var(--ink);font-size:12px;font-weight:600}
+.node circle,.node rect{fill:var(--panel);stroke:var(--ink);stroke-width:2.5}
+.node.visited circle,.node.visited rect{fill:var(--steel);stroke:var(--steel)}
+.node.onpath circle,.node.onpath rect{fill:var(--signal);stroke:var(--signal-ink)}
+.node .nid{font-size:13px;font-weight:700;fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.node.visited .nid{fill:#fff}.node.onpath .nid{fill:var(--signal-ink)}
+.node .nname{font-size:13px;fill:var(--ink);text-anchor:middle;font-weight:600}
+.node .ncount{font-size:11px;fill:var(--muted);text-anchor:middle}
+.badge circle{fill:var(--ink)}.badge text{fill:var(--panel);font-size:11px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+.result{margin-top:12px;font-size:14px;min-height:22px}
+.result .seq{font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);padding:10px 14px;border-top:1px solid var(--line)}
+.legend i{display:inline-block;width:18px;height:6px;border-radius:3px;vertical-align:middle;margin-right:5px}
+
+.log{list-style:none;margin:0;padding:0;font-size:13px;max-height:300px;overflow:auto}
+.log li{padding:7px 0;border-bottom:1px solid var(--line);display:flex;gap:10px}
+.log time{color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+
+#bst{width:100%;height:auto;display:block}
+.bst-edge{stroke:var(--lane);stroke-width:1.5}
+.bst-node circle{fill:var(--soft);stroke:var(--ink);stroke-width:1.5}
+.bst-node.hit circle{fill:var(--signal);stroke:var(--signal-ink)}
+.bst-node text{font-size:12px;font-weight:600;fill:var(--ink);text-anchor:middle;dominant-baseline:central}
+.bst-wrap{overflow-x:auto}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);opacity:0;background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:4px;font-size:14px;transition:.2s;pointer-events:none;max-width:90vw;z-index:9}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.bad{background:var(--bad);color:#fff}
+
+@media (max-width:980px){
+  .g-side,.g2{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  aside{position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+  .brand{padding:12px 16px 6px}.brand b{font-size:20px}.brand span{display:none}
+  nav{flex-direction:row;overflow-x:auto;padding:0 8px 8px}
+  nav button{white-space:nowrap;padding:8px 10px}
+  nav button.on{box-shadow:inset 0 -3px 0 var(--signal)}
+  nav small{display:none}
+  .team,.railfoot{display:none}
+  main{padding:20px 16px 40px}
+  h1{font-size:32px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat:nth-child(3){border-left:0}.stat:nth-child(n+3){border-top:1px solid var(--line)}
+}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="hazard"></div>
+    <div class="brand"><b>Smart Warehouse Control</b><span>Inventory, orders and floor routing</span></div>
+    <nav id="nav">
+      <button data-tab="overview" class="on">Overview</button>
+      <button data-tab="inventory">Inventory <small>Hash · BST</small></button>
+      <button data-tab="orders">Orders <small>Queue</small></button>
+      <button data-tab="map">Floor map <small>Graph</small></button>
+    </nav>
+    <div class="team">
+      <p><strong>Parv</strong> · inventory (C)</p>
+      <p><strong>Shivam</strong> · orders (C++)</p>
+      <p><strong>Siddhant</strong> · floor graph (C)</p>
+    </div>
+    <div class="railfoot">
+      <button id="themeBtn" title="Switch light or dark">Theme</button>
+      <button id="resetBtn" title="Restore sample data">Reset data</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- OVERVIEW -->
+    <section class="view on" id="view-overview">
+      <header class="view-h"><div><h1>Today on the floor</h1><p class="sub">Stock levels, the order line and recent activity across all three modules.</p></div></header>
+      <div class="stats" id="stats"></div>
+      <div class="grid g-side">
+        <div class="grid">
+          <div class="panel"><h2>Next orders in line</h2><div class="queue" id="ovQueue"></div></div>
+          <div class="panel"><h2>Running low <span class="ds-tag">below 10 units</span></h2><div class="tbl-wrap" id="ovLow"></div></div>
+        </div>
+        <div class="panel"><h2>Activity</h2><ul class="log" id="log"></ul></div>
+      </div>
+    </section>
+
+    <!-- INVENTORY -->
+    <section class="view" id="view-inventory">
+      <header class="view-h"><div><h1>Inventory</h1><p class="sub">Products are stored in a hash table (ID mod 10, chained with linked lists) for fast lookup, and in a binary search tree for the sorted listing.</p></div></header>
+      <div class="grid g-side">
+        <div class="panel">
+          <h2>Products <span class="ds-tag">BST in-order traversal, sorted by ID</span></h2>
+          <div class="tbl-wrap" id="invTable"></div>
+        </div>
+        <div class="grid">
+          <form class="panel" id="prodForm">
+            <h2>Add product</h2>
+            <div class="row">
+              <div><label for="pId">Product ID</label><input id="pId" type="number" min="1" required></div>
+              <div><label for="pQty">Quantity</label><input id="pQty" type="number" min="0" required></div>
+            </div>
+            <div class="row">
+              <div><label for="pName">Name</label><input id="pName" maxlength="40" required></div>
+              <div><label for="pLoc">Stored at</label><select id="pLoc"></select></div>
+            </div>
+            <button class="btn primary" type="submit">Add product</button>
+          </form>
+          <form class="panel" id="searchForm">
+            <h2>Find product</h2>
+            <div class="row"><div><label for="sId">Product ID</label><input id="sId" type="number" min="1" required></div></div>
+            <div class="btns">
+              <button class="btn primary" type="submit">Search</button>
+              <button class="btn" type="button" id="restockBtn">Restock</button>
+              <button class="btn danger" type="button" id="delBtn">Delete</button>
+            </div>
+            <p class="hint" id="searchOut"></p>
+          </form>
+        </div>
+      </div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="panel"><h2>Hash table <span class="ds-tag">10 buckets, separate chaining</span></h2><div class="buckets" id="buckets"></div></div>
+        <div class="panel"><h2>Binary search tree <span class="ds-tag">keyed by product ID</span></h2><div class="bst-wrap"><svg id="bst"></svg></div></div>
+      </div>
+    </section>
+
+    <!-- ORDERS -->
+    <section class="view" id="view-orders">
+      <header class="view-h"><div><h1>Orders</h1><p class="sub">Orders wait in a FIFO queue. Processing takes the front order, checks stock, deducts it and plans the pick route from the dispatch dock.</p></div>
+        <button class="btn primary" id="processBtn">Process next order</button>
+      </header>
+      <div class="panel" style="margin-bottom:16px"><h2>Order queue <span class="ds-tag" id="qCount"></span></h2><div class="queue" id="queue"></div></div>
+      <div class="grid g-side">
+        <div class="panel"><h2>Processed and closed</h2><div class="tbl-wrap" id="history"></div></div>
+        <div class="grid">
+          <form class="panel" id="orderForm">
+            <h2>New order</h2>
+            <div class="row"><div><label for="oProd">Product</label><select id="oProd"></select></div></div>
+            <div class="row"><div><label for="oQty">Quantity</label><input id="oQty" type="number" min="1" value="1" required></div></div>
+            <p class="hint" id="availOut"></p>
+            <button class="btn primary" type="submit" style="margin-top:10px">Add to queue</button>
+          </form>
+          <form class="panel" id="oSearchForm">
+            <h2>Find order</h2>
+            <div class="row"><div><label for="osId">Order ID</label><input id="osId" type="number" min="1" required></div></div>
+            <div class="btns"><button class="btn primary" type="submit">Search</button><button class="btn danger" type="button" id="cancelBtn">Cancel order</button></div>
+            <p class="hint" id="oSearchOut"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAP -->
+    <section class="view" id="view-map">
+      <header class="view-h"><div><h1>Floor map</h1><p class="sub">Locations are graph nodes and aisles are weighted edges in an adjacency matrix. Click an aisle to block it, then run shortest path again to see the reroute.</p></div></header>
+      <div class="grid g-side">
+        <div>
+          <div class="mapbox">
+            <svg id="map" viewBox="0 0 800 480" role="img" aria-label="Warehouse floor graph"></svg>
+            <div class="legend">
+              <span><i style="background:var(--lane)"></i>Open aisle</span>
+              <span><i style="background:var(--signal)"></i>Route</span>
+              <span><i style="background:var(--bad)"></i>Blocked</span>
+              <span><i style="background:var(--steel)"></i>Visited</span>
+            </div>
+          </div>
+          <div class="panel result" id="mResult" style="margin-top:12px">Pick a start location and run a search.</div>
+        </div>
+        <div class="grid">
+          <div class="panel">
+            <h2>Search the floor</h2>
+            <div class="row">
+              <div><label for="mStart">From</label><select id="mStart"></select></div>
+              <div><label for="mEnd">To</label><select id="mEnd"></select></div>
+            </div>
+            <div class="btns">
+              <button class="btn primary" id="dijBtn">Shortest path</button>
+              <button class="btn" id="bfsBtn">BFS</button>
+              <button class="btn" id="dfsBtn">DFS</button>
+            </div>
+          </div>
+          <form class="panel" id="pathForm">
+            <h2>Aisles</h2>
+            <div class="row">
+              <div><label for="eA">From</label><select id="eA"></select></div>
+              <div><label for="eB">To</label><select id="eB"></select></div>
+              <div><label for="eW">Distance (m)</label><input id="eW" type="number" min="1" value="5" required></div>
+            </div>
+            <div class="btns"><button class="btn primary" type="submit">Add or update aisle</button><button class="btn danger" type="button" id="rmEdge">Remove</button></div>
+          </form>
+          <div class="panel">
+            <h2>New location</h2>
+            <div class="row"><div><label for="nName">Name</label><input id="nName" maxlength="18" placeholder="e.g. Aisle D"></div></div>
+            <button class="btn" id="placeBtn">Place on map</button>
+            <p class="hint" id="placeHint">Up to 20 locations, as in the C code.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== Data structures (mirroring the C/C++ modules) ===================== */
+class HashTable{                     // Parv: hash table with linked-list chaining
+  constructor(size=10){this.size=size;this.buckets=new Array(size).fill(null);}
+  hash(id){return id%this.size;}
+  insert(p){const i=this.hash(p.id);for(let c=this.buckets[i];c;c=c.next)if(c.data.id===p.id)return false;
+    this.buckets[i]={data:p,next:this.buckets[i]};return true;}
+  search(id){const i=this.hash(id);let steps=0;for(let c=this.buckets[i];c;c=c.next){steps++;if(c.data.id===id)return{p:c.data,bucket:i,steps};}return{p:null,bucket:i,steps};}
+  remove(id){const i=this.hash(id);let prev=null;for(let c=this.buckets[i];c;prev=c,c=c.next){if(c.data.id===id){if(prev)prev.next=c.next;else this.buckets[i]=c.next;return true;}}return false;}
+}
+class BST{                           // Parv: tree for sorted product listing
+  constructor(){this.root=null;}
+  insert(p){const n={data:p,left:null,right:null};if(!this.root){this.root=n;return;}
+    let c=this.root;for(;;){if(p.id<c.data.id){if(!c.left){c.left=n;return;}c=c.left;}else{if(!c.right){c.right=n;return;}c=c.right;}}}
+  remove(id){this.root=this._rm(this.root,id);}
+  _rm(n,id){if(!n)return null;if(id<n.data.id)n.left=this._rm(n.left,id);else if(id>n.data.id)n.right=this._rm(n.right,id);
+    else{if(!n.left)return n.right;if(!n.right)return n.left;let s=n.right;while(s.left)s=s.left;n.data=s.data;n.right=this._rm(n.right,s.data.id);}return n;}
+  inorder(){const out=[];const f=n=>{if(!n)return;f(n.left);out.push(n.data);f(n.right);};f(this.root);return out;}
+}
+const MAX=20;
+
+/* ===================== State ===================== */
+let S, HT, TREE, hitId=null, probeBucket=null, placing=false, anim={visited:new Map(),onpath:new Set(),edges:new Set()}, timer=null;
+
+function seed(){
+  const nodes=[{name:"Dispatch dock",x:90,y:240},{name:"Aisle A",x:270,y:110},{name:"Aisle B",x:270,y:370},
+    {name:"Aisle C",x:470,y:240},{name:"Cold store",x:670,y:110},{name:"Returns bay",x:670,y:370}];
+  const adj=nodes.map(()=>nodes.map(()=>0));
+  [[0,1,4],[0,2,5],[1,3,6],[2,3,3],[1,4,9],[3,4,4],[3,5,5],[2,5,10]].forEach(([a,b,w])=>{adj[a][b]=w;adj[b][a]=w;});
+  return{nodes,adj,blocked:{},nextOrderId:1004,
+    products:[{id:150,name:"Cable ties",qty:85,loc:2},{id:101,name:"Copper wire roll",qty:40,loc:1},{id:205,name:"LED panel",qty:12,loc:3},
+      {id:58,name:"Pallet wrap",qty:30,loc:2},{id:117,name:"Safety gloves",qty:120,loc:1},{id:342,name:"Vaccine cooler box",qty:6,loc:4},{id:263,name:"Returned drill",qty:2,loc:5}],
+    orders:[{id:1001,pid:205,name:"LED panel",qty:4,status:"Pending"},{id:1002,pid:342,name:"Vaccine cooler box",qty:10,status:"Pending"},{id:1003,pid:117,name:"Safety gloves",qty:20,status:"Pending"}],
+    history:[],log:[{t:now(),m:"Sample data loaded"}]};
+}
+function now(){const d=new Date();return d.toTimeString().slice(0,5);}
+function load(){try{const r=localStorage.getItem("sw-state");if(r){const s=JSON.parse(r);if(s&&s.nodes&&s.adj)return s;}}catch(e){}return seed();}
+function save(){try{localStorage.setItem("sw-state",JSON.stringify(S));}catch(e){}}
+function build(){HT=new HashTable(10);TREE=new BST();S.products.forEach(p=>{HT.insert(p);TREE.insert(p);});}
+function log(m){S.log.unshift({t:now(),m});S.log=S.log.slice(0,40);}
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(m,bad){const t=$("#toast");t.textContent=m;t.className="toast show"+(bad?" bad":"");clearTimeout(toast.h);toast.h=setTimeout(()=>t.className="toast",2400);}
+
+/* ===================== Graph algorithms (Siddhant) ===================== */
+const ek=(a,b)=>a<b?a+"-"+b:b+"-"+a;
+const open=(u,v)=>S.adj[u][v]>0&&!S.blocked[ek(u,v)];
+function bfs(s){const n=S.nodes.length,vis=Array(n).fill(false),q=[s],out=[];vis[s]=true;
+  while(q.length){const u=q.shift();out.push(u);for(let v=0;v<n;v++)if(open(u,v)&&!vis[v]){vis[v]=true;q.push(v);}}return out;}
+function dfs(s){const n=S.nodes.length,vis=Array(n).fill(false),out=[];
+  (function go(u){vis[u]=true;out.push(u);for(let v=0;v<n;v++)if(open(u,v)&&!vis[v])go(v);})(s);return out;}
+function dijkstra(s){const n=S.nodes.length,dist=Array(n).fill(Infinity),prev=Array(n).fill(-1),done=Array(n).fill(false);dist[s]=0;
+  for(let k=0;k<n;k++){let u=-1;for(let i=0;i<n;i++)if(!done[i]&&(u<0||dist[i]<dist[u]))u=i;
+    if(u<0||dist[u]===Infinity)break;done[u]=true;
+    for(let v=0;v<n;v++)if(open(u,v)&&dist[u]+S.adj[u][v]<dist[v]){dist[v]=dist[u]+S.adj[u][v];prev[v]=u;}}
+  return{dist,prev};}
+function pathTo(prev,t){const p=[];for(let v=t;v!==-1;v=prev[v])p.unshift(v);return p;}
+
+/* ===================== Rendering ===================== */
+function statusPill(s){const c={Pending:"p-pending",Processed:"p-processed","Out of stock":"p-out",Cancelled:"p-cancelled"}[s]||"p-pending";return `<span class="pill ${c}">${esc(s)}</span>`;}
+function locName(i){return S.nodes[i]?S.nodes[i].name:"Unknown";}
+
+function renderStats(){
+  const units=S.products.reduce((a,p)=>a+p.qty,0),low=S.products.filter(p=>p.qty<10).length,done=S.history.filter(h=>h.status==="Processed").length;
+  $("#stats").innerHTML=`<div class="stat"><b>${S.products.length}</b><span>Products</span></div><div class="stat"><b>${units}</b><span>Units in stock</span></div>
+   <div class="stat"><b>${S.orders.length}</b><span>Orders waiting</span></div><div class="stat ${low?"warn":""}"><b>${low}</b><span>Low-stock products</span></div>`;
+  void done;
+}
+function queueHTML(list,limit){
+  if(!list.length)return `<p class="empty">No orders waiting. Add one from the Orders page.</p>`;
+  const items=list.slice(0,limit||list.length);
+  return items.map((o,i)=>{const r=HT.search(o.pid).p,ok=r&&r.qty>=o.qty;
+    const tag=i===0?"Front":(i===list.length-1?"Rear":"");
+    return `${i?'<span class="qarrow" aria-hidden="true">›</span>':""}<div class="qcell ${i===0?"front":""}">${tag?`<span class="tag">${tag}</span>`:""}
+      <b>#${o.id} · ${esc(o.name)}</b><span>${o.qty} units · </span><span class="${ok?"":"low"}">${ok?"in stock":"short on stock"}</span></div>`;}).join("")
+    +(limit&&list.length>limit?`<span class="qarrow">+${list.length-limit} more</span>`:"");
+}
+function renderOverview(){
+  renderStats();
+  $("#ovQueue").innerHTML=queueHTML(S.orders,4);
+  const low=TREE.inorder().filter(p=>p.qty<10);
+  $("#ovLow").innerHTML=low.length?`<table><tr><th>ID</th><th>Product</th><th>Qty</th><th>Location</th></tr>${low.map(p=>`<tr><td class="num">${p.id}</td><td>${esc(p.name)}</td><td class="num low">${p.qty}</td><td>${esc(locName(p.loc))}</td></tr>`).join("")}</table>`:`<p class="empty">Every product has 10 or more units.</p>`;
+  $("#log").innerHTML=S.log.map(l=>`<li><time>${l.t}</time><span>${esc(l.m)}</span></li>`).join("");
+}
+function renderInventory(){
+  const list=TREE.inorder();
+  $("#invTable").innerHTML=list.length?`<table><tr><th>ID</th><th>Product</th><th>Qty</th><th>Location</th><th>Bucket</th></tr>${list.map(p=>`<tr class="${p.id===hitId?"hit":""}"><td class="num">${p.id}</td><td>${esc(p.name)}</td><td class="num ${p.qty<10?"low":""}">${p.qty}</td><td>${esc(locName(p.loc))}</td><td class="num">${HT.hash(p.id)}</td></tr>`).join("")}</table>`:`<p class="empty">No products yet. Add the first one with the form.</p>`;
+  let h="";for(let i=0;i<HT.size;i++){let chain="";for(let c=HT.buckets[i];c;c=c.next)chain+=`<span class="chain ${c.data.id===hitId?"hit":""}">${c.data.id} ${esc(c.data.name)}</span> → `;
+    h+=`<div class="bucket ${i===probeBucket?"probe":""}"><span class="idx">${i}</span>${chain}<span class="nul">NULL</span></div>`;}
+  $("#buckets").innerHTML=h;
+  // BST layout: x by in-order index, y by depth
+  const pos=[];let idx=0,maxD=0;(function lay(n,d){if(!n)return;lay(n.left,d+1);pos.push({n,x:idx++,d});maxD=Math.max(maxD,d);lay(n.right,d+1);})(TREE.root,0);
+  const W=Math.max(320,idx*58+20),H=(maxD+1)*62+20,map=new Map(pos.map(p=>[p.n,p]));
+  const px=p=>30+p.x*58,py=p=>30+p.d*62;let e="",nd="";
+  pos.forEach(p=>{[p.n.left,p.n.right].forEach(c=>{if(c){const q=map.get(c);e+=`<line class="bst-edge" x1="${px(p)}" y1="${py(p)}" x2="${px(q)}" y2="${py(q)}"/>`;}});
+    nd+=`<g class="bst-node ${p.n.data.id===hitId?"hit":""}"><circle cx="${px(p)}" cy="${py(p)}" r="20"/><text x="${px(p)}" y="${py(p)}">${p.n.data.id}</text></g>`;});
+  const svg=$("#bst");svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.style.minWidth=W+"px";svg.innerHTML=pos.length?e+nd:`<text x="10" y="30" fill="currentColor">Tree is empty</text>`;
+}
+function renderOrders(){
+  $("#qCount").textContent=`${S.orders.length} waiting`;
+  $("#queue").innerHTML=queueHTML(S.orders);
+  $("#history").innerHTML=S.history.length?`<table><tr><th>Order</th><th>Product</th><th>Qty</th><th>Status</th><th>Pick route</th></tr>${S.history.map(h=>`<tr><td class="num">#${h.id}</td><td>${esc(h.name)}</td><td class="num">${h.qty}</td><td>${statusPill(h.status)}</td><td>${h.route?esc(h.route):"—"}</td></tr>`).join("")}</table>`:`<p class="empty">Nothing processed yet. Use "Process next order" to take the front of the queue.</p>`;
+  const sel=$("#oProd"),cur=sel.value;sel.innerHTML=TREE.inorder().map(p=>`<option value="${p.id}">${p.id} · ${esc(p.name)}</option>`).join("");if(cur)sel.value=cur;
+  updateAvail();
+}
+function updateAvail(){const pid=+$("#oProd").value,q=+$("#oQty").value||0,r=HT.search(pid).p,o=$("#availOut");
+  if(!r){o.textContent="Add a product to inventory first.";o.className="hint";return;}
+  o.textContent=r.qty>=q?`${r.qty} in stock at ${locName(r.loc)}. This order can be filled.`:`Only ${r.qty} in stock. The order will be marked out of stock when processed.`;
+  o.className="hint "+(r.qty>=q?"ok":"bad");}
+function nodeOptions(skip0){return S.nodes.map((n,i)=>skip0&&i===0?"":`<option value="${i}">${i+1}. ${esc(n.name)}</option>`).join("");}
+function fillSelects(){[["#pLoc",true],["#mStart"],["#mEnd"],["#eA"],["#eB"]].forEach(([s,k])=>{const el=$(s),v=el.value;el.innerHTML=nodeOptions(k);if(v!==""&&el.querySelector(`option[value="${v}"]`))el.value=v;});
+  if($("#mEnd").value==="0"&&S.nodes.length>3)$("#mEnd").value="3";if($("#eB").value==="0"&&S.nodes.length>1)$("#eB").value="1";}
+function renderMap(){
+  const n=S.nodes.length;let e="",l="",nd="";
+  const counts=S.nodes.map(()=>0);S.products.forEach(p=>{if(counts[p.loc]!==undefined)counts[p.loc]++;});
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)if(S.adj[i][j]>0){const a=S.nodes[i],b=S.nodes[j],k=ek(i,j),bl=S.blocked[k];
+    const cls=bl?"blocked":(anim.edges.has(k)?"route":"");
+    e+=`<line class="edge ${cls}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/><line class="edge-hit" data-e="${k}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"><title>${bl?"Reopen":"Block"} aisle ${esc(a.name)} – ${esc(b.name)}</title></line>`;
+    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,t=bl?"✕":S.adj[i][j]+"m";
+    l+=`<g class="elabel" pointer-events="none"><rect x="${mx-19}" y="${my-11}" width="38" height="22" rx="3"/><text x="${mx}" y="${my+4}" text-anchor="middle">${t}</text></g>`;}
+  S.nodes.forEach((p,i)=>{const cls=anim.onpath.has(i)?"onpath":(anim.visited.has(i)?"visited":"");
+    const shape=i===0?`<rect x="${p.x-24}" y="${p.y-24}" width="48" height="48" rx="4"/>`:`<circle cx="${p.x}" cy="${p.y}" r="24"/>`;
+    const badge=anim.visited.has(i)?`<g class="badge"><circle cx="${p.x+22}" cy="${p.y-22}" r="10"/><text x="${p.x+22}" y="${p.y-22}">${anim.visited.get(i)}</text></g>`:"";
+    nd+=`<g class="node ${cls}">${shape}<text class="nid" x="${p.x}" y="${p.y}">${i+1}</text><text class="nname" x="${p.x}" y="${p.y+44}">${esc(p.name)}</text>${i?`<text class="ncount" x="${p.x}" y="${p.y+59}">${counts[i]} product${counts[i]===1?"":"s"}</text>`:""}${badge}</g>`;});
+  $("#map").innerHTML=`<defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="var(--line)" stroke-width="1" opacity=".55"/></pattern></defs><rect width="800" height="480" fill="url(#grid)"/>${e}${l}${nd}`;
+}
+function renderAll(){build();fillSelects();renderOverview();renderInventory();renderOrders();renderMap();$("#placeBtn").disabled=S.nodes.length>=MAX;save();}
+
+/* ===================== Map animation ===================== */
+const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
+function animate(order,pathNodes,msg){
+  clearInterval(timer);anim={visited:new Map(),onpath:new Set(),edges:new Set()};
+  const finish=()=>{pathNodes.forEach((v,i)=>{anim.onpath.add(v);if(i)anim.edges.add(ek(pathNodes[i-1],v));});renderMap();$("#mResult").innerHTML=msg;};
+  if(reduced){order.forEach((v,i)=>anim.visited.set(v,i+1));finish();return;}
+  let i=0;$("#mResult").textContent="Running…";
+  timer=setInterval(()=>{if(i<order.length){anim.visited.set(order[i],i+1);i++;renderMap();}else{clearInterval(timer);finish();}},380);
+}
+function seqHTML(arr){return `<span class="seq">${arr.map(v=>esc(S.nodes[v].name)).join(" → ")}</span>`;}
+
+/* ===================== Events ===================== */
+$("#nav").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="view-"+b.dataset.tab));window.scrollTo(0,0);});
+
+$("#prodForm").addEventListener("submit",e=>{e.preventDefault();
+  const p={id:+$("#pId").value,name:$("#pName").value.trim(),qty:+$("#pQty").value,loc:+$("#pLoc").value};
+  if(!p.name||p.id<1||p.qty<0)return toast("Enter an ID, name and a quantity of 0 or more.",true);
+  if(HT.search(p.id).p)return toast(`Product ${p.id} already exists. Use Restock to change its quantity.`,true);
+  S.products.push(p);hitId=p.id;probeBucket=p.id%10;log(`Added product ${p.id} ${p.name} (${p.qty} units)`);renderAll();e.target.reset();toast(`Added ${p.name} to bucket ${p.id%10}`);});
+
+function doSearch(){const id=+$("#sId").value,r=HT.search(id),o=$("#searchOut");probeBucket=r.bucket;
+  if(r.p){hitId=id;o.className="hint ok";o.textContent=`Found ${r.p.name}: ${r.p.qty} units at ${locName(r.p.loc)}. Bucket ${r.bucket}, ${r.steps} node${r.steps>1?"s":""} checked.`;}
+  else{hitId=null;o.className="hint bad";o.textContent=`No product with ID ${id}. Bucket ${r.bucket} checked, ${r.steps} node${r.steps===1?"":"s"} in its chain.`;}
+  renderInventory();return r;}
+$("#searchForm").addEventListener("submit",e=>{e.preventDefault();doSearch();});
+$("#restockBtn").addEventListener("click",()=>{const r=doSearch();if(!r.p)return;const add=parseInt(prompt(`Units to add to ${r.p.name} (use a negative number to remove):`,"10"),10);
+  if(isNaN(add))return;if(r.p.qty+add<0)return toast("Stock can't go below zero.",true);r.p.qty+=add;log(`Restocked ${r.p.name} by ${add} (now ${r.p.qty})`);renderAll();doSearch();toast(`${r.p.name} now has ${r.p.qty} units`);});
+$("#delBtn").addEventListener("click",()=>{const id=+$("#sId").value,r=HT.search(id);if(!r.p)return toast(`No product with ID ${id}.`,true);
+  if(!confirm(`Delete ${r.p.name} from inventory?`))return;S.products=S.products.filter(p=>p.id!==id);hitId=null;log(`Deleted product ${id} ${r.p.name}`);renderAll();$("#searchOut").textContent=`Deleted ${r.p.name} from the hash table and the tree.`;});
+
+$("#oProd").addEventListener("change",updateAvail);$("#oQty").addEventListener("input",updateAvail);
+$("#orderForm").addEventListener("submit",e=>{e.preventDefault();const p=HT.search(+$("#oProd").value).p,q=+$("#oQty").value;
+  if(!p)return toast("Choose a product first.",true);if(q<1)return toast("Quantity must be at least 1.",true);
+  const o={id:S.nextOrderId++,pid:p.id,name:p.name,qty:q,status:"Pending"};S.orders.push(o);log(`Order #${o.id} queued: ${q} × ${p.name}`);renderAll();toast(`Order #${o.id} added to the rear of the queue`);});
+
+$("#processBtn").addEventListener("click",()=>{
+  if(!S.orders.length)return toast("No orders waiting.",true);
+  const o=S.orders.shift(),p=HT.search(o.pid).p;
+  if(!p){o.status="Cancelled";o.route="Product no longer in inventory";}
+  else if(p.qty<o.qty){o.status="Out of stock";o.route=`Needs ${o.qty}, only ${p.qty} available`;}
+  else{p.qty-=o.qty;o.status="Processed";const{dist,prev}=dijkstra(0);
+    o.route=dist[p.loc]===Infinity?"No open route from dock":pathTo(prev,p.loc).map(locName).join(" → ")+` (${dist[p.loc]} m)`;}
+  S.history.unshift(o);log(`Order #${o.id} ${o.status.toLowerCase()}`);renderAll();toast(`Order #${o.id}: ${o.status}`,o.status!=="Processed");});
+
+function findOrder(id){const q=S.orders.findIndex(o=>o.id===id);if(q>=0)return{o:S.orders[q],pos:q};const h=S.history.find(o=>o.id===id);return h?{o:h,pos:-1}:null;}
+$("#oSearchForm").addEventListener("submit",e=>{e.preventDefault();const id=+$("#osId").value,r=findOrder(id),out=$("#oSearchOut");
+  if(!r){out.className="hint bad";out.textContent=`No order #${id}.`;return;}
+  out.className="hint";out.innerHTML=`#${r.o.id}: ${r.o.qty} × ${esc(r.o.name)} — ${statusPill(r.o.status)} ${r.pos>=0?` Position ${r.pos+1} of ${S.orders.length} in the queue.`:""}`;});
+$("#cancelBtn").addEventListener("click",()=>{const id=+$("#osId").value,i=S.orders.findIndex(o=>o.id===id);
+  if(i<0)return toast(`Order #${id} isn't waiting in the queue.`,true);const[o]=S.orders.splice(i,1);o.status="Cancelled";S.history.unshift(o);log(`Order #${id} cancelled`);renderAll();$("#oSearchOut").textContent=`Order #${id} cancelled and removed from the queue.`;});
+
+$("#bfsBtn").addEventListener("click",()=>{const s=+$("#mStart").value,o=bfs(s);animate(o,[],`BFS from ${esc(S.nodes[s].name)} visits ${o.length} of ${S.nodes.length} locations: ${seqHTML(o)}`);});
+$("#dfsBtn").addEventListener("click",()=>{const s=+$("#mStart").value,o=dfs(s);animate(o,[],`DFS from ${esc(S.nodes[s].name)} visits ${o.length} of ${S.nodes.length} locations: ${seqHTML(o)}`);});
+$("#dijBtn").addEventListener("click",()=>{const s=+$("#mStart").value,t=+$("#mEnd").value;if(s===t)return toast("Choose two different locations.",true);
+  const{dist,prev}=dijkstra(s);if(dist[t]===Infinity){animate([],[],`No open route from ${esc(S.nodes[s].name)} to ${esc(S.nodes[t].name)}. Reopen a blocked aisle or add one.`);return;}
+  const p=pathTo(prev,t),blocked=Object.keys(S.blocked).length;
+  animate(p,p,`Shortest route: ${seqHTML(p)} — <b>${dist[t]} m</b>${blocked?` (avoiding ${blocked} blocked aisle${blocked>1?"s":""})`:""}`);});
+
+$("#map").addEventListener("click",e=>{
+  if(placing){const pt=$("#map").createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const p=pt.matrixTransform($("#map").getScreenCTM().inverse());
+    const name=$("#nName").value.trim()||`Location ${S.nodes.length+1}`;S.nodes.push({name,x:Math.round(Math.min(760,Math.max(40,p.x))),y:Math.round(Math.min(420,Math.max(40,p.y)))});
+    S.adj.forEach(r=>r.push(0));S.adj.push(Array(S.nodes.length).fill(0));placing=false;$("#map").classList.remove("placing");$("#placeBtn").classList.remove("on");
+    $("#nName").value="";$("#placeHint").textContent="Placed. Connect it with an aisle so routes can reach it.";log(`Added location ${S.nodes.length}: ${name}`);renderAll();return;}
+  const h=e.target.closest(".edge-hit");if(!h)return;const k=h.dataset.e;if(S.blocked[k])delete S.blocked[k];else S.blocked[k]=true;
+  const[a,b]=k.split("-").map(Number);log(`Aisle ${locName(a)} – ${locName(b)} ${S.blocked[k]?"blocked":"reopened"}`);anim={visited:new Map(),onpath:new Set(),edges:new Set()};
+  renderAll();$("#mResult").textContent=`${S.blocked[k]?"Blocked":"Reopened"} ${locName(a)} – ${locName(b)}. Run shortest path again to reroute.`;});
+$("#placeBtn").addEventListener("click",()=>{if(S.nodes.length>=MAX)return toast("Maximum of 20 locations reached.",true);placing=!placing;
+  $("#map").classList.toggle("placing",placing);$("#placeBtn").classList.toggle("on",placing);$("#placeHint").textContent=placing?"Click anywhere on the map to place it.":"Up to 20 locations, as in the C code.";});
+$("#pathForm").addEventListener("submit",e=>{e.preventDefault();const a=+$("#eA").value,b=+$("#eB").value,w=+$("#eW").value;
+  if(a===b)return toast("An aisle needs two different locations.",true);if(w<1)return toast("Distance must be at least 1.",true);
+  S.adj[a][b]=S.adj[b][a]=w;log(`Aisle ${locName(a)} – ${locName(b)} set to ${w} m`);renderAll();toast("Aisle saved");});
+$("#rmEdge").addEventListener("click",()=>{const a=+$("#eA").value,b=+$("#eB").value;if(!S.adj[a][b])return toast("Those locations aren't connected.",true);
+  S.adj[a][b]=S.adj[b][a]=0;delete S.blocked[ek(a,b)];log(`Aisle ${locName(a)} – ${locName(b)} removed`);anim={visited:new Map(),onpath:new Set(),edges:new Set()};renderAll();toast("Aisle removed");});
+
+$("#resetBtn").addEventListener("click",()=>{if(!confirm("Replace everything with the sample data?"))return;S=seed();hitId=null;probeBucket=null;anim={visited:new Map(),onpath:new Set(),edges:new Set()};renderAll();toast("Sample data restored");});
+$("#themeBtn").addEventListener("click",()=>{const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme=dark?"light":"dark";try{localStorage.setItem("sw-theme",r.dataset.theme);}catch(e){}});
+try{const t=localStorage.getItem("sw-theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}
+
+S=load();renderAll();
+</script>
+</body>
+</html>
