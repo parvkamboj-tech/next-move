@@ -20,3 +20,5 @@ NEXT MOVE is a Data Structures and Algorithms based smart warehouse system desig
 - C
 - C++
 - Data Structures & Algorithms
+
+Project maintenance update: setup and module documentation reviewed.
