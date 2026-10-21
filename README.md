@@ -22,3 +22,9 @@ NEXT MOVE is a Data Structures and Algorithms based smart warehouse system desig
 - Data Structures & Algorithms
 
 Project maintenance update: setup and module documentation reviewed.
+
+## Project Modules
+- Inventory Management: product records and inventory operations.
+- Order Management: order creation, display and queue processing.
+- Warehouse Graph: warehouse locations and path optimization.
+
